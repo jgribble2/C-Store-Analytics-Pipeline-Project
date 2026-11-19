@@ -11,7 +11,7 @@ data platform, then rebuilding the BI semantic layer on clean, tested models.
 ## Architecture
 
 ```
-generate_sap_data.py ──► Snowflake RAW_SAP ──► dbt staging ──► dbt marts (star schema) ──► MicroStrategy
+generate_sap_data.py ──► Snowflake RAW_SAP ──► dbt staging ──► dbt marts (star schema) ──► MicroStrategy (Mosaic)
    (SAP-style CSVs)       (all VARCHAR)       (rename, cast,     fct_sales, dim_store,      attributes, facts,
                                                sign handling)     dim_product, dim_date      metrics, dashboards
 ```
@@ -90,6 +90,54 @@ dbt build        # run all models and tests
 dbt docs generate; dbt docs serve   # browse model docs and lineage
 ```
 
+## MicroStrategy (Strategy Mosaic) semantic layer
+
+The dbt marts are modeled in a Strategy One **Mosaic model** (`C-Store Sales Model`), connected
+to Snowflake through a dedicated read-only login (`MSTR_READER` / role `BI_READER`, see
+`bi_reader_setup.sql`) that can only `SELECT` from `CSTORE.MARTS`.
+
+![Mosaic model diagram](docs/images/model_diagram.png)
+
+**Schema objects.** The auto-generated draft model was reviewed and corrected:
+
+| Fix | Why |
+|---|---|
+| Mapped the **Date** attribute ID to `DIM_DATE.DATE_DAY` *and* `FCT_SALES.SALE_DATE` (heterogeneous column mapping) | The auto-modeler created two unrelated date attributes, so sales could not be analyzed by month or year |
+| Added DESC forms (`STORE_NAME`, `PRODUCT_NAME`, `CATEGORY_NAME`) and set them as display forms; removed the duplicate name attributes | Reports show names instead of codes, with one object per business concept |
+| Converted `Square Feet` and `Fuel Positions` from metrics to attributes | They describe a store; summing them across sales rows is meaningless |
+| Enabled time attributes on Date (Day, Week, Month, Quarter, Year) | Provides the date hierarchy and powers time-series functions |
+| Set base metrics to decimal data types and currency/number formats | Reconciliation found a 1¢ floating-point drift with the default `Double` type |
+
+**Business metrics**
+
+| Metric | Formula | Type |
+|---|---|---|
+| Gross Margin % | `[Gross Margin] / [Net Sales]` | Compound (ratio of totals, correct at any level) |
+| Basket Count | `Count<Distinct=True>([Billing Document])`, condition: Transaction Type = Sale AND Is Cancelled Activity = 0 | Conditional |
+| Avg Basket Size | `[Net Sales] / [Basket Count]` | Compound |
+| Net Sales LY | `PreviousYear([Date]@ID, 1, [Net Sales])` | Time-series |
+| Net Sales YoY % | `([Net Sales] - [Net Sales LY]) / [Net Sales LY]` | Compound |
+
+![Business metrics](docs/images/created_metrics.png)
+
+## Reconciliation
+
+Strategy totals were checked against Snowflake with `reconciliation.sql` and match exactly:
+
+| Year | Net Sales | Gross Margin % | Basket Count | Avg Basket Size | Net Sales LY | YoY % |
+|---|---|---|---|---|---|---|
+| 2024 | $1,996,531.03 | 36.3% | 158,045 | $12.63 | | |
+| 2025 | $2,451,888.37 | 35.7% | 183,486 | $13.36 | $1,996,531.03 | 22.8% |
+
+![Reconciliation grid](docs/images/reconciliation.png)
+
+## Dashboard
+
+KPI cards (with prior-year comparison), monthly net sales vs. last year, and sales by category,
+filtered by year.
+
+![C-Store Sales Dashboard](docs/images/dashboard.png)
+
 ## Roadmap
 
 - [x] Synthetic SAP-style source data
@@ -98,5 +146,6 @@ dbt docs generate; dbt docs serve   # browse model docs and lineage
 - [x] dbt marts: `fct_sales`, `dim_store`, `dim_product`, `dim_date`
 - [x] dbt tests (unique, not_null, relationships) and docs/lineage
 - [ ] GitHub Actions CI running `dbt build` on every pull request
-- [ ] MicroStrategy schema objects, metrics, prompted report and dashboard
-- [ ] SQL reconciliation of MicroStrategy totals against Snowflake
+- [x] MicroStrategy semantic layer: attributes, conditional/compound/time-series metrics, dashboard
+- [ ] MicroStrategy prompted report and weekly subscription
+- [x] SQL reconciliation of MicroStrategy totals against Snowflake
