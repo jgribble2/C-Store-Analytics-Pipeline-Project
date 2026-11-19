@@ -56,13 +56,47 @@ python generate_sap_data.py --help     # date range, volume, seed options
 Then run `load_raw_sap.sql` in a Snowflake worksheet to create the RAW_SAP tables and load the files.
 The output is repeatable: the same `--seed` always produces the same data.
 
+## dbt models
+
+```
+cstore_dbt/models/
+├── staging/sap/        one view per SAP table: rename, cast, filter client and language
+├── intermediate/       int_sales_lines__signed: lines joined to headers, return/cancel signs applied
+└── marts/              star schema: fct_sales, dim_store, dim_product, dim_date
+```
+
+| Model | Grain | Notes |
+|---|---|---|
+| `fct_sales` | Billing document line | Signed measures: net sales, cost, gross margin, tax, fuel gallons, merchandise units |
+| `dim_store` | Store | Location, district, format, fuel, square feet, comparable-store flag |
+| `dim_product` | Product | Name, category, fuel flag, active flag |
+| `dim_date` | Calendar day | Year, quarter, month, ISO week, weekday, same day last year |
+
+**Data tests:** keys are unique and not null, every fact row joins to each dimension, document
+types are valid, and two custom tests check that billing header totals match their line items and
+that cancelled sales net to $0 against their S1 reversals.
+
+### Running dbt
+
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install dbt-core dbt-snowflake
+python setup_snowflake_key.py --user <SNOWFLAKE_USER>   # key-pair login; run the printed ALTER USER in Snowflake
+# copy cstore_dbt/profiles.example.yml to ~/.dbt/profiles.yml and set the account
+cd cstore_dbt
+dbt debug        # check the connection
+dbt build        # run all models and tests
+dbt docs generate; dbt docs serve   # browse model docs and lineage
+```
+
 ## Roadmap
 
 - [x] Synthetic SAP-style source data
 - [x] Raw load into Snowflake
-- [ ] dbt staging models with source tests
-- [ ] dbt marts: `fct_sales`, `dim_store`, `dim_product`, `dim_date`
-- [ ] dbt tests (unique, not_null, relationships) and docs/lineage
+- [x] dbt staging models with source tests
+- [x] dbt marts: `fct_sales`, `dim_store`, `dim_product`, `dim_date`
+- [x] dbt tests (unique, not_null, relationships) and docs/lineage
 - [ ] GitHub Actions CI running `dbt build` on every pull request
 - [ ] MicroStrategy schema objects, metrics, prompted report and dashboard
 - [ ] SQL reconciliation of MicroStrategy totals against Snowflake

@@ -1,0 +1,10 @@
+version: 2
+
+models:
+  - name: int_sales_lines__signed
+    description: >
+      Billing lines joined to headers with signs applied (returns and cancellations negative).
+      Same grain as stg_sap__billing_items.
+    columns:
+      - name: billing_line_id
+        data_tests: [not_null, unique]

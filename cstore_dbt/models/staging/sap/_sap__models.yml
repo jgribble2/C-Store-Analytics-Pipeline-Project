@@ -1,0 +1,69 @@
+version: 2
+
+models:
+  - name: stg_sap__plants
+    description: Stores from SAP T001W with readable column names.
+    columns:
+      - name: store_id
+        data_tests: [not_null, unique]
+
+  - name: stg_sap__store_attributes
+    description: Store format, fuel, size, and open/close dates from ZSTORE_ATTR.
+    columns:
+      - name: store_id
+        data_tests: [not_null, unique]
+      - name: opened_date
+        data_tests: [not_null]
+
+  - name: stg_sap__material_groups
+    description: Product categories from SAP T023T (English).
+    columns:
+      - name: category_id
+        data_tests: [not_null, unique]
+
+  - name: stg_sap__materials
+    description: Products from SAP MARA. product_id keeps leading zeros; product_number strips them.
+    columns:
+      - name: product_id
+        data_tests: [not_null, unique]
+      - name: base_uom
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["EA", "GAL"]
+
+  - name: stg_sap__material_descriptions
+    description: English product names from SAP MAKT.
+    columns:
+      - name: product_id
+        data_tests: [not_null, unique]
+
+  - name: stg_sap__billing_headers
+    description: >
+      Billing document headers from SAP VBRK, typed and renamed. amount_sign is +1 for sales
+      and -1 for returns (ZRET) and cancellations (S1), because SAP stores all amounts as positive.
+    columns:
+      - name: billing_doc_id
+        data_tests: [not_null, unique]
+      - name: billing_date
+        data_tests: [not_null]
+      - name: transaction_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["Sale", "Return", "Cancellation"]
+
+  - name: stg_sap__billing_items
+    description: Billing document lines from SAP VBRP, typed and renamed. Amounts are unsigned.
+    columns:
+      - name: billing_line_id
+        description: Billing document number + line number.
+        data_tests: [not_null, unique]
+      - name: billing_doc_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_sap__billing_headers')
+                field: billing_doc_id

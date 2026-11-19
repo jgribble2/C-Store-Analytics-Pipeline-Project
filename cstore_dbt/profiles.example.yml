@@ -1,0 +1,21 @@
+# Copy this file to C:\Users\<you>\.dbt\profiles.yml and fill in the account.
+# The real profiles.yml stays out of Git (see .gitignore).
+#
+# Find your account identifier by running this in a Snowflake worksheet:
+#   SELECT CURRENT_ORGANIZATION_NAME() || '-' || CURRENT_ACCOUNT_NAME();
+#
+# Authentication uses a key pair (create it with setup_snowflake_key.py).
+cstore:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: ORGNAME-ACCOUNTNAME        # <-- replace with the query result
+      user: JGRIBBLE2
+      role: ACCOUNTADMIN
+      warehouse: CSTORE_WH
+      database: CSTORE
+      schema: DBT_DEV                     # default schema; models use STAGING / INTERMEDIATE / MARTS
+      authenticator: snowflake_jwt
+      private_key_path: C:/Users/jgrib/.snowflake/rsa_key.p8
+      threads: 4

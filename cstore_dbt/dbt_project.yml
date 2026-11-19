@@ -1,0 +1,28 @@
+name: cstore
+version: "1.0.0"
+config-version: 2
+profile: cstore
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  sap_client: "100"                  # SAP client (MANDT) to read from
+  calendar_start_date: "2023-01-01"  # dim_date range; starts a year early for YoY comparisons
+  calendar_end_date: "2026-12-31"
+  comp_store_cutoff: "2024-01-01"    # stores open on/before this date count as comparable
+
+models:
+  cstore:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts

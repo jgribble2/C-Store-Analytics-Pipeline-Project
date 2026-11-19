@@ -1,0 +1,45 @@
+version: 2
+
+sources:
+  - name: sap
+    description: >
+      Raw SAP ECC extract landed in Snowflake by load_raw_sap.sql. Every column is VARCHAR,
+      exactly as extracted; casting and renaming happen in the staging models.
+    database: CSTORE
+    schema: RAW_SAP
+    tables:
+      - name: t001w
+        description: Plants (stores).
+        columns:
+          - name: werks
+            description: Plant / store number.
+            data_tests: [not_null, unique]
+      - name: zstore_attr
+        description: Custom Z-table with store attributes (format, fuel, size, open/close dates).
+        columns:
+          - name: werks
+            data_tests: [not_null, unique]
+      - name: t023t
+        description: Material group (category) descriptions by language.
+      - name: mara
+        description: Material master (one row per product).
+        columns:
+          - name: matnr
+            description: 18-character material number with leading zeros.
+            data_tests: [not_null, unique]
+      - name: makt
+        description: Material descriptions by language.
+      - name: vbrk
+        description: Billing document headers. One per POS basket, return, or cancellation.
+        columns:
+          - name: vbeln
+            description: 10-digit billing document number.
+            data_tests: [not_null, unique]
+          - name: fkart
+            description: Billing type. ZPOS = sale, ZRET = return, S1 = cancellation.
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ["ZPOS", "ZRET", "S1"]
+      - name: vbrp
+        description: Billing document line items.

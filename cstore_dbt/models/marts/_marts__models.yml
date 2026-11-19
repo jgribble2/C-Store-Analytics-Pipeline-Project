@@ -1,0 +1,65 @@
+version: 2
+
+models:
+  - name: fct_sales
+    description: >
+      Sales fact at billing-line grain. Measures are signed: sales positive, returns and
+      cancellations negative, so a simple SUM gives net sales. Fuel is in gallons
+      (fuel_gallons); merchandise is in eaches (merchandise_units).
+    columns:
+      - name: sales_line_id
+        description: Billing document number + line number.
+        data_tests: [not_null, unique]
+      - name: store_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_store')
+                field: store_id
+      - name: product_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_product')
+                field: product_id
+      - name: sale_date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_day
+      - name: transaction_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["Sale", "Return", "Cancellation"]
+      - name: net_sales
+        description: Net sales in USD, excluding tax. Signed.
+        data_tests: [not_null]
+      - name: gross_margin
+        description: net_sales minus cost_amount. Signed.
+
+  - name: dim_store
+    description: One row per store, combining SAP plant master and store attributes.
+    columns:
+      - name: store_id
+        data_tests: [not_null, unique]
+      - name: is_comparable_store
+        description: True if the store was open on or before the comp_store_cutoff var.
+
+  - name: dim_product
+    description: One row per product with category and fuel flag.
+    columns:
+      - name: product_id
+        data_tests: [not_null, unique]
+      - name: category_name
+        data_tests: [not_null]
+
+  - name: dim_date
+    description: One row per calendar day, with year, quarter, month, week, and weekday attributes.
+    columns:
+      - name: date_day
+        data_tests: [not_null, unique]
